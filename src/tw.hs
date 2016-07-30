@@ -1,27 +1,39 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import Data.Bifunctor
 import Data.Char
+import Data.Monoid
 import Data.Word
 import System.Environment
 import System.Exit
+
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.IO as Text
 
+-- | File entry defined by it's name and content.
+data Entry = Entry Text.Text Text.Text
+
 -- | Check whether a line ends with whitespace.
-check :: (Word64, Text.Text)
-      -> (Word64, Bool)
+check :: (Word64, Text.Text) -- ^ numbered line
+      -> (Word64, Bool)      -- ^ numbered decision
 check = second (isSpace . Text.last)
 
 -- | Print a warning to the stdout with the line number.
-warn :: (Word64, Bool)
-     -> IO ()
-warn (_, False)  = return ()
-warn (num, True) = print num
+warn :: Text.Text      -- ^ file path
+     -> (Word64, Bool) -- ^ line decision
+     -> IO ()          -- ^ action
+warn _    (_, False)  = return ()
+warn path (num, True) = Text.putStrLn $ path <> ": " <> Text.pack (show num)
 
 -- | Parse command-line arguments.
-getInput :: [String]     -- ^ arguments
-         -> IO Text.Text -- ^ input file's content
-getInput []       = Text.getContents
-getInput (path:_) = Text.readFile path
+getEntries :: [String]   -- ^ arguments
+           -> IO [Entry] -- ^ file entries
+getEntries []    = do
+  content <- Text.getContents
+  return [Entry "<stdin>" content]
+getEntries paths = do
+  contents <- mapM Text.readFile paths
+  return $ zipWith Entry (map Text.pack paths) contents
 
 -- | Take a decision based on a boolean value.
 decide :: Bool -- ^ value
@@ -31,14 +43,21 @@ decide :: Bool -- ^ value
 decide True  x _ = x
 decide False _ y = y
 
+-- | Process a single file entry - determine the trailing whitespace
+-- property and print an appropriate warning to the stdout.
+processEntry :: Entry   -- ^ entry
+             -> IO Bool -- ^ trailing decision
+processEntry (Entry path content) = do
+  let numbered = zip [1..] (Text.lines content)
+  let nonEmpty = filter (not . Text.null . snd) numbered
+  let trailing = map check nonEmpty
+  mapM_ (warn path) trailing
+  return $ any snd trailing
+
 -- | Print numbers of lines that end with whitespace.
 main :: IO ()
 main = do
-  args <- getArgs
-  input <- getInput args
-  let numbered = zip [1..] (Text.lines input)
-  let nonEmpty = filter (not . Text.null . snd) numbered
-  let trailing = map check nonEmpty
-  mapM_ warn trailing
-  decide (any snd trailing) exitFailure exitSuccess
+  entries  <- getArgs >>= getEntries
+  trailing <- mapM processEntry entries
+  decide (or trailing) exitFailure exitSuccess
 
