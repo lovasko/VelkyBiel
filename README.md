@@ -10,7 +10,7 @@ The utility accepts zero or more arguments: when the argument count is zero,
 
 ### Synopsis
 ```
-tw [file ...]
+tw [FILE ...]
 ```
 
 ## Return code
