@@ -1,4 +1,7 @@
 # tw
+
+[![Build Status](https://travis-ci.org/lovasko/tw.svg?branch=master)](https://travis-ci.org/lovasko/tw)
+
 Trailing whitespace detector `tw` command-line utility scans a set of files and
 tests each line of each file for whitespace characters at its end.  The utility
 processes only one line at a time and therefore can be used with files that
